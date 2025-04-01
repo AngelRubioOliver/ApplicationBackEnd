@@ -13,7 +13,7 @@ public interface UserRepositoryPort
 
     List<User> findAll();
 
-    Optional<User> updateTask(User user);
+    Optional<User> updateUser(User user);
 
-    boolean deleteTask(Long id);
+    boolean deleteUser(Long id);
 }

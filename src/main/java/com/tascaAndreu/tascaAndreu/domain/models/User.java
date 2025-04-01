@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Data
 public class User {
 
-    private int id;
+    private Long id;
 
     private String username;
 
@@ -21,6 +21,6 @@ public class User {
     private String email;
 
 
-    private LocalDateTime createdat;
+    private LocalDateTime createdAt;
 
 }

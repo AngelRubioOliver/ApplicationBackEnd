@@ -1,5 +1,6 @@
 package com.tascaAndreu.tascaAndreu.infrastructure.entities;
 
+import com.tascaAndreu.tascaAndreu.domain.models.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -16,7 +17,7 @@ import java.time.LocalDateTime;
 public class UserEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int id;
+    private Long id;
 
     private String username;
 
@@ -24,6 +25,15 @@ public class UserEntity {
     private String email;
 
     @CreationTimestamp
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+
+    public static UserEntity fromDomainModel(User user) {
+        return new UserEntity(user.getId(), user.getUsername(), user.getEmail(), user.getCreatedAt());
+    }
+
+    public User toDomainModel() {
+        return new User(id, username, email, createdAt);
+    }
 }

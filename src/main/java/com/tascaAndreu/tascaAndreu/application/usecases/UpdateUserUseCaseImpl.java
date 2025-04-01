@@ -18,6 +18,6 @@ public class UpdateUserUseCaseImpl implements UpdateUserUseCase {
 
     @Override
     public Optional<User> updateUser(Long id, User updateUser) {
-        return userRepositoryPort.updateTask(updateUser);
+        return userRepositoryPort.updateUser(updateUser);
     }
 }

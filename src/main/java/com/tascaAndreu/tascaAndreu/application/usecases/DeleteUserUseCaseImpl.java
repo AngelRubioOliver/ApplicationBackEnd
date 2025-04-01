@@ -14,6 +14,6 @@ public class DeleteUserUseCaseImpl implements DeleteUserUseCase
 
     @Override
     public boolean deleteUser(Long id) {
-        return userRepositoryPort.deleteTask(id);
+        return userRepositoryPort.deleteUser(id);
     }
 }
