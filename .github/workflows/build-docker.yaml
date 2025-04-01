@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_CONTAINER_REGISTRY: tascaAndreu
+  AZURE_CONTAINER_REGISTRY: tascaandreu
   CONTAINER_APP_NAME: tascaandreu
   RESOURCE_GROUP: DefaultResourceGroup-ESC
 
