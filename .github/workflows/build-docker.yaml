@@ -17,33 +17,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up .NET Core
-        uses: actions/setup-dotnet@v4
+      # Configura Java (en lugar de .NET)
+      - name: Set up JDK
+        uses: actions/setup-java@v3
         with:
-          dotnet-version: "8.0.x"
+          java-version: "17"
+          distribution: "temurin"
 
-      - name: Build
-        run: mvn clean install
+      # Compila con Maven
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
 
+      # Configura Docker
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Login en Azure
       - name: Log in to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      # Login en ACR
       - name: Log in to ACR
         run: az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY }}
 
+      # Construye y sube la imagen Docker
       - name: Build and push container image to ACR
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile
+          file: Dockerfile  # Asegúrate de que sea para Java
           push: true
           tags: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }}
 
+      # Despliega en Azure Container Apps
       - name: Deploy to Azure Container Apps
         uses: azure/container-apps-deploy@v1
         with:
@@ -51,4 +59,4 @@ jobs:
           resourceGroup: ${{ env.RESOURCE_GROUP }}
           containerAppName: ${{ env.CONTAINER_APP_NAME }}
           environmentVariables: |
-            ASPNETCORE_ENVIRONMENT=Development
+            SPRING_PROFILES_ACTIVE=prod  # Para Spring Boot, no ASPNETCORE_ENVIRONMENT
