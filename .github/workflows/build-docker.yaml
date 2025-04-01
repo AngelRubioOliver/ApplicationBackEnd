@@ -9,7 +9,7 @@ on:
 
 env:
   AZURE_CONTAINER_REGISTRY: tascaAndreu
-  CONTAINER_APP_NAME: tascaandreu
+  CONTAINER_APP_NAME: tascaAndreu
   RESOURCE_GROUP: DefaultResourceGroup-ESC
 
 jobs:
@@ -58,6 +58,6 @@ jobs:
           resourceGroup: ${{ env.RESOURCE_GROUP }}
           containerAppName: ${{ env.CONTAINER_APP_NAME }}
           environmentVariables: |
-            ASPNETCORE_ENVIRONMENT=Development
+            ASPNET CORE_ENVIRONMENT=Development
 
 
