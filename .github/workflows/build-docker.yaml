@@ -9,6 +9,7 @@ env:
   AZURE_CONTAINER_REGISTRY: tascaAndreu
   CONTAINER_APP_NAME: tascaandreu
   RESOURCE_GROUP: DefaultResourceGroup-ESC
+  AZURE_CONTAINER_URL_NAME: tascaandreu
 
 jobs:
   build-and-deploy:
@@ -49,7 +50,7 @@ jobs:
           context: .
           file: Dockerfile  # Asegúrate de que sea para Java
           push: true
-          tags: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }}
+          tags: ${{ AZURE_CONTAINER_URL_NAME }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }}
 
       # Despliega en Azure Container Apps
       - name: Deploy to Azure Container Apps
