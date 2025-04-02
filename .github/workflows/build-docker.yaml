@@ -10,7 +10,6 @@ env:
   CONTAINER_APP_NAME: tascaandreu
   RESOURCE_GROUP: DefaultResourceGroup-ESC
 
-
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
@@ -18,7 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Configura Java (en lugar de .NET)
+      # Convierte el nombre del ACR a minúsculas y lo guarda en GITHUB_ENV
+      - name: Convert ACR name to lowercase
+        run: echo "AZURE_CONTAINER_REGISTRY_LOWER=$(echo $AZURE_CONTAINER_REGISTRY | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      # Configura Java
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
@@ -39,11 +42,11 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Login en ACR
+      # Login en ACR con el nombre en minúsculas
       - name: Log in to ACR
-        run: az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY }}
+        run: az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}
 
-      # Construye y sube la imagen Docker
+      # Construye y sube la imagen Docker con el ACR en minúsculas
       - name: Build and push container image to ACR
         uses: docker/build-push-action@v6
         with:
@@ -52,12 +55,11 @@ jobs:
           push: true
           tags: ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }}
 
-
-      # Despliega en Azure Container Apps
+      # Despliega en Azure Container Apps con el ACR en minúsculas
       - name: Deploy to Azure Container Apps
         uses: azure/container-apps-deploy-action@v1
         with:
-          imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }}
+          imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }}
           resourceGroup: ${{ env.RESOURCE_GROUP }}
           containerAppName: ${{ env.CONTAINER_APP_NAME }}
           environmentVariables: |
