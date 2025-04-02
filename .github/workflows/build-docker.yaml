@@ -46,13 +46,21 @@ jobs:
         run: |
           sed -i 's|image: .*|image: ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }}|' docker-compose.yaml
 
-      # Construye y sube todas las imágenes con docker-compose
-      - name: Build and push images using docker-compose
+      # Construir las imágenes
+      - name: Build images using docker-compose
         run: |
           docker-compose -f docker-compose.yaml build
+
+      # Listar las imágenes locales para verificar la construcción
+      - name: List Docker images
+        run: docker images
+
+      # Subir las imágenes a ACR
+      - name: Push images to ACR using docker-compose
+        run: |
           docker-compose -f docker-compose.yaml push
 
-      # Verificar si la imagen se subió correctamente
+      # Verificar si la imagen se subió correctamente a ACR
       - name: Verify image in ACR
         run: |
           az acr repository show-tags --name ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }} --repository ${{ env.CONTAINER_INSTANCE_NAME }}
