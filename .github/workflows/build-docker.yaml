@@ -23,6 +23,17 @@ jobs:
       - name: Convert ACR name to lowercase
         run: echo "AZURE_CONTAINER_REGISTRY_LOWER=$(echo $AZURE_CONTAINER_REGISTRY | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
+      # Configura Java
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      # Compila con Maven
+      - name: Build with Maven
+        run: mvn clean package -DskipTests
+
       # Configura Docker
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -33,22 +44,20 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Login en ACR
+      # Login en ACR con el nombre en minúsculas
       - name: Log in to ACR
         run: az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}
 
-      # Reemplaza la imagen en docker-compose.yaml con la imagen subida a ACR
-      - name: Update docker-compose.yaml with ACR image
-        run: |
-          sed -i 's|image: .*|image: ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }}|' docker-compose.yaml
+      # Construye y sube la imagen Docker con el ACR en minúsculas
+      - name: Build and push container image to ACR
+        uses: docker/build-push-action@v6
+        with:
+          context: .  # Carpeta raíz donde está el Dockerfile
+          file: Dockerfile  # Asegúrate de que sea para Java
+          push: true
+          tags: ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }}
 
-      # Construye y sube todas las imágenes con docker-compose
-      - name: Build and push images using docker-compose
-        run: |
-          docker-compose -f docker-compose.yaml build
-          docker-compose -f docker-compose.yaml push
-
-      # Desplegar en Azure Container Instance usando docker-compose
+      # Despliega en Azure Container Instance
       - name: Deploy to Azure Container Instance
         run: |
           az container create \
@@ -64,3 +73,5 @@ jobs:
             --location ${{ env.REGION }} \
             --dns-name-label ${{ env.CONTAINER_INSTANCE_NAME }} \
             --ports 80 8080
+      
+      
