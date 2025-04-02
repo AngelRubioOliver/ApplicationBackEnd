@@ -1,4 +1,4 @@
-name: Deploy to Azure Container App
+name: Deploy to Azure Container Instance with Health Checks
 
 on:
   push:
@@ -7,11 +7,11 @@ on:
 
 env:
   AZURE_CONTAINER_REGISTRY: tascaAndreu
-  CONTAINER_APP_NAME: tascaandreu
+  CONTAINER_INSTANCE_NAME: tascaandreu
   RESOURCE_GROUP: DefaultResourceGroup-ESC
   REGION: eastus
   IMAGE_TAG: ${{ github.sha }}
-  CONTAINER_APP_ENVIRONMENT: my-container-app-env  # Nombre del entorno de Container Apps
+  HEALTH_CHECK_PATH: /actuator/health  # Ruta de health check para Spring Boot
 
 jobs:
   build-and-deploy:
@@ -34,58 +34,58 @@ jobs:
       - name: Convert ACR name to lowercase
         run: echo "AZURE_CONTAINER_REGISTRY_LOWER=$(echo '${{ env.AZURE_CONTAINER_REGISTRY }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      # Login en ACR
-      - name: Log in to ACR
-        run: |
-          az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }} --expose-token
-          echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io \
-            -u ${{ secrets.AZURE_REGISTRY_USERNAME }} \
-            --password-stdin
-
       # Construir y subir la imagen
       - name: Build and push Docker image
         run: |
-          docker build -t ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ env.IMAGE_TAG }} .
-          docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ env.IMAGE_TAG }}
+          docker build -t ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }} .
+          echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io -u ${{ secrets.AZURE_REGISTRY_USERNAME }} --password-stdin
+          docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }}
 
-      # Verificar la imagen en ACR
-      - name: Verify image in ACR
+      # Desplegar con comprobaciones de salud
+      - name: Deploy with health checks
         run: |
-          az acr repository show-tags --name ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }} --repository ${{ env.CONTAINER_APP_NAME }}
-
-      # Crear el entorno de Container Apps si no existe
-      - name: Create Container Apps environment
-        run: |
-          az containerapp env show \
-            --name ${{ env.CONTAINER_APP_ENVIRONMENT }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} || \
-          az containerapp env create \
-            --name ${{ env.CONTAINER_APP_ENVIRONMENT }} \
+          # Eliminar instancia existente si existe
+          az container delete \
+            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --location ${{ env.REGION }}
+            --yes || true
 
-      # Desplegar en Azure Container App
-      - name: Deploy to Azure Container App
-        run: |
-          # Crear o actualizar la Container App
-          az containerapp create \
-            --name ${{ env.CONTAINER_APP_NAME }} \
+          # Crear nueva instancia con health checks
+          az container create \
+            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --environment ${{ env.CONTAINER_APP_ENVIRONMENT }} \
-            --image ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ env.IMAGE_TAG }} \
-            --target-port 8080 \
-            --ingress external \
-            --registry-server ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io \
+            --image ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }} \
+            --cpu 1 --memory 1.5 \
+            --os-type Linux \
+            --environment-variables SPRING_PROFILES_ACTIVE=prod \
+            --registry-login-server ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io \
             --registry-username ${{ secrets.AZURE_REGISTRY_USERNAME }} \
             --registry-password ${{ secrets.AZURE_REGISTRY_PASSWORD }} \
-            --env-vars SPRING_PROFILES_ACTIVE=prod \
-            --query properties.configuration.ingress.fqdn
+            --location ${{ env.REGION }} \
+            --dns-name-label ${{ env.CONTAINER_INSTANCE_NAME }}-${{ github.run_id }} \
+            --ports 80 8080 \
+            --protocol TCP \
+            --restart-policy Always \
+            --command-line "sh -c 'java -jar /app.jar'" \
+            --ip-address Public \
+            --health-probe-interval 10 \
+            --health-probe-path ${{ env.HEALTH_CHECK_PATH }} \
+            --health-probe-timeout 5 \
+            --health-probe-port 8080 \
+            --health-probe-failure-threshold 3 \
+            --health-probe-success-threshold 1
 
-      # Mostrar información de la aplicación
-      - name: Show Container App info
+      # Verificar estado del contenedor
+      - name: Check container status
         run: |
-          az containerapp show \
-            --name ${{ env.CONTAINER_APP_NAME }} \
+          echo "Estado del contenedor:"
+          az container show \
+            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --query "{name:name, state:properties.provisioningState, fqdn:properties.configuration.ingress.fqdn, revision:properties.latestRevisionName}" \
-            --output table
+            --query "{state:instanceView.state, events:instanceView.events}" \
+            --output json
+
+          echo "\nLogs del contenedor:"
+          az container logs \
+            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }}
