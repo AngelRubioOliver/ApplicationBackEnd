@@ -60,32 +60,34 @@ jobs:
       # Desplegar a ACI (versió millorada)
       - name: Deploy to ACI
         run: |
-          # Eliminar instància existent si existeix
-          az container delete \
-            --name ${{ env.CONTAINER_GROUP_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --yes || true
-
-          # Crear nova instància amb configuració millorada
+          # Crear un grup de containers amb múltiples containers (app + PostgreSQL)
           az container create \
             --name ${{ env.CONTAINER_GROUP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --image ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
             --location ${{ env.REGION }} \
             --ip-address Public \
-            --ports 80 443 \
+            --ports 8080 \
             --os-type Linux \
             --restart-policy Always \
             --registry-login-server ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io \
             --registry-username ${{ secrets.AZURE_REGISTRY_USERNAME }} \
             --registry-password ${{ secrets.AZURE_REGISTRY_PASSWORD }} \
             --environment-variables \
-              SPRING_DATASOURCE_URL="${{ secrets.SPRING_DATASOURCE_URL }}" \
-              SPRING_DATASOURCE_USERNAME="${{ secrets.SPRING_DATASOURCE_USERNAME }}" \
-              SPRING_DATASOURCE_PASSWORD="${{ secrets.SPRING_DATASOURCE_PASSWORD }}" \
-            --cpu 2 \
-            --memory 3.5 \
-            --dns-name-label ${{ env.CONTAINER_GROUP_NAME }}-${{ github.run_id }}
+              SPRING_DATASOURCE_URL="jdbc:postgresql://postgres:5432/tascaAndreu" \
+              SPRING_DATASOURCE_USERNAME="test" \
+              SPRING_DATASOURCE_PASSWORD="test" \
+            --command-line "sh -c 'java -jar /app.jar'"
+
+          # Afegir el container PostgreSQL al mateix grup
+          az container add \
+            --name postgres \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --image postgres:13 \
+            --environment-variables \
+              POSTGRES_DB=tascaAndreu \
+              POSTGRES_USER=test \
+              POSTGRES_PASSWORD=test
 
       # Verificació del desplegament
       - name: Verify deployment
