@@ -1,10 +1,10 @@
-package com.tascaAndreu.tascaAndreu.domain.models;
+package com.tascaandreu.tascaandreu.domain.models;
 
-import jakarta.persistence.*;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
+
 
 import java.time.LocalDateTime;
 

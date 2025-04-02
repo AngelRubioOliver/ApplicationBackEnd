@@ -1,8 +1,8 @@
-package com.tascaAndreu.tascaAndreu.application.usecases;
+package com.tascaandreu.tascaandreu.application.usecases;
 
 
-import com.tascaAndreu.tascaAndreu.domain.ports.in.DeleteUserUseCase;
-import com.tascaAndreu.tascaAndreu.domain.ports.out.UserRepositoryPort;
+import com.tascaandreu.tascaandreu.domain.ports.in.DeleteUserUseCase;
+import com.tascaandreu.tascaandreu.domain.ports.out.UserRepositoryPort;
 
 public class DeleteUserUseCaseImpl implements DeleteUserUseCase
 {

@@ -1,12 +1,12 @@
-package com.tascaAndreu.tascaAndreu.infrastructure.config;
+package com.tascaandreu.tascaandreu.infrastructure.config;
 
-import com.tascaAndreu.tascaAndreu.application.services.UserService;
-import com.tascaAndreu.tascaAndreu.application.usecases.CreateUserUseCaseImpl;
-import com.tascaAndreu.tascaAndreu.application.usecases.DeleteUserUseCaseImpl;
-import com.tascaAndreu.tascaAndreu.application.usecases.RetrieveUserUseCaseImpl;
-import com.tascaAndreu.tascaAndreu.application.usecases.UpdateUserUseCaseImpl;
-import com.tascaAndreu.tascaAndreu.domain.ports.out.UserRepositoryPort;
-import com.tascaAndreu.tascaAndreu.infrastructure.repositories.JpaUserRepositoryAdapter;
+import com.tascaandreu.tascaandreu.application.services.UserService;
+import com.tascaandreu.tascaandreu.application.usecases.CreateUserUseCaseImpl;
+import com.tascaandreu.tascaandreu.application.usecases.DeleteUserUseCaseImpl;
+import com.tascaandreu.tascaandreu.application.usecases.RetrieveUserUseCaseImpl;
+import com.tascaandreu.tascaandreu.application.usecases.UpdateUserUseCaseImpl;
+import com.tascaandreu.tascaandreu.domain.ports.out.UserRepositoryPort;
+import com.tascaandreu.tascaandreu.infrastructure.repositories.JpaUserRepositoryAdapter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

@@ -1,8 +1,8 @@
-package com.tascaAndreu.tascaAndreu.infrastructure.controllers;
+package com.tascaandreu.tascaandreu.infrastructure.controllers;
 
 
-import com.tascaAndreu.tascaAndreu.application.services.UserService;
-import com.tascaAndreu.tascaAndreu.domain.models.User;
+import com.tascaandreu.tascaandreu.application.services.UserService;
+import com.tascaandreu.tascaandreu.domain.models.User;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,7 +22,7 @@ public class UserController {
         User createdUser = userService.createUser(user);
         return new ResponseEntity<>(createdUser, HttpStatus.CREATED);
     }
-    @GetMapping("/{taskId}")
+    @GetMapping("/{userId}")
     public ResponseEntity<User> getUser(@PathVariable Long userId) {
         return userService.retrieveUser(userId).map(task -> new ResponseEntity<>(task, HttpStatus.OK)).orElse(new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
@@ -33,15 +33,15 @@ public class UserController {
         return new ResponseEntity<>(users, HttpStatus.OK);
     }
     // Actualizacion tarea
-    @PutMapping("/{taskId}")
-    public ResponseEntity<User> updateUser(@PathVariable Long taskId, @RequestBody User updatedUser) {
-        return userService.updateUser(taskId, updatedUser).map(task -> new ResponseEntity<>(task, HttpStatus.OK)).orElse(new ResponseEntity<>(HttpStatus.NOT_FOUND));
+    @PutMapping("/{userId}")
+    public ResponseEntity<User> updateUser(@PathVariable Long userId, @RequestBody User updatedUser) {
+        return userService.updateUser(userId, updatedUser).map(task -> new ResponseEntity<>(task, HttpStatus.OK)).orElse(new ResponseEntity<>(HttpStatus.NOT_FOUND));
     }
 
     // Eliminacion tarea
-    @DeleteMapping("/{taskId}")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long taskId) {
-        if (userService.deleteUser(taskId)){
+    @DeleteMapping("/{userId}")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long userId) {
+        if (userService.deleteUser(userId)){
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);
             } else {
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);

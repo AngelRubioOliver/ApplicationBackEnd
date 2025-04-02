@@ -1,6 +1,6 @@
-package com.tascaAndreu.tascaAndreu.domain.ports.in;
+package com.tascaandreu.tascaandreu.domain.ports.in;
 
-import com.tascaAndreu.tascaAndreu.domain.models.User;
+import com.tascaandreu.tascaandreu.domain.models.User;
 
 import java.util.List;
 import java.util.Optional;

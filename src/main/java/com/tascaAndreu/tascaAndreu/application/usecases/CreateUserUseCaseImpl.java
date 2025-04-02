@@ -1,8 +1,8 @@
-package com.tascaAndreu.tascaAndreu.application.usecases;
+package com.tascaandreu.tascaandreu.application.usecases;
 
-import com.tascaAndreu.tascaAndreu.domain.models.User;
-import com.tascaAndreu.tascaAndreu.domain.ports.in.CreateUserUseCase;
-import com.tascaAndreu.tascaAndreu.domain.ports.out.UserRepositoryPort;
+import com.tascaandreu.tascaandreu.domain.models.User;
+import com.tascaandreu.tascaandreu.domain.ports.in.CreateUserUseCase;
+import com.tascaandreu.tascaandreu.domain.ports.out.UserRepositoryPort;
 
 public class CreateUserUseCaseImpl implements CreateUserUseCase {
 

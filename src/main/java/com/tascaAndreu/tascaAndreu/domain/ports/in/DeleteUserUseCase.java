@@ -1,4 +1,4 @@
-package com.tascaAndreu.tascaAndreu.domain.ports.in;
+package com.tascaandreu.tascaandreu.domain.ports.in;
 
 public interface DeleteUserUseCase
 {

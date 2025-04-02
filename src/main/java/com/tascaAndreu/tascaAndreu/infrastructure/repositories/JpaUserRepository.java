@@ -1,10 +1,10 @@
-package com.tascaAndreu.tascaAndreu.infrastructure.repositories;
+package com.tascaandreu.tascaandreu.infrastructure.repositories;
 
 
-import com.tascaAndreu.tascaAndreu.infrastructure.entities.UserEntity;
+import com.tascaandreu.tascaandreu.infrastructure.entities.UserEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface JpaUserRepository extends JpaRepository<UserEntity, Long> { // Obliga a extender JpaRepository<TaskEntity, Long> from Spring Data JPA{
+public interface JpaUserRepository extends JpaRepository<UserEntity, Long> {
 }

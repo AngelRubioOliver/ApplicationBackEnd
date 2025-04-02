@@ -1,11 +1,11 @@
-package com.tascaAndreu.tascaAndreu.application.services;
+package com.tascaandreu.tascaandreu.application.services;
 
 
-import com.tascaAndreu.tascaAndreu.domain.models.User;
-import com.tascaAndreu.tascaAndreu.domain.ports.in.CreateUserUseCase;
-import com.tascaAndreu.tascaAndreu.domain.ports.in.DeleteUserUseCase;
-import com.tascaAndreu.tascaAndreu.domain.ports.in.RetrieveUserUseCase;
-import com.tascaAndreu.tascaAndreu.domain.ports.in.UpdateUserUseCase;
+import com.tascaandreu.tascaandreu.domain.models.User;
+import com.tascaandreu.tascaandreu.domain.ports.in.CreateUserUseCase;
+import com.tascaandreu.tascaandreu.domain.ports.in.DeleteUserUseCase;
+import com.tascaandreu.tascaandreu.domain.ports.in.RetrieveUserUseCase;
+import com.tascaandreu.tascaandreu.domain.ports.in.UpdateUserUseCase;
 
 import java.util.List;
 import java.util.Optional;

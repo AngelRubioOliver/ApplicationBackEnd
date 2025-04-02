@@ -1,14 +1,14 @@
-package com.tascaAndreu.tascaAndreu.infrastructure.repositories;
+package com.tascaandreu.tascaandreu.infrastructure.repositories;
 
 
-import com.tascaAndreu.tascaAndreu.domain.models.User;
-import com.tascaAndreu.tascaAndreu.domain.ports.out.UserRepositoryPort;
-import com.tascaAndreu.tascaAndreu.infrastructure.entities.UserEntity;
+import com.tascaandreu.tascaandreu.domain.models.User;
+import com.tascaandreu.tascaandreu.domain.ports.out.UserRepositoryPort;
+import com.tascaandreu.tascaandreu.infrastructure.entities.UserEntity;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
+
 
 @Component
 public class JpaUserRepositoryAdapter implements UserRepositoryPort {
@@ -32,7 +32,7 @@ public class JpaUserRepositoryAdapter implements UserRepositoryPort {
 
     @Override
     public List<User> findAll() {
-        return jpaUserRepository.findAll().stream().map(UserEntity::toDomainModel).collect(Collectors.toList());
+        return jpaUserRepository.findAll().stream().map(UserEntity::toDomainModel).toList();
     }
 
     @Override

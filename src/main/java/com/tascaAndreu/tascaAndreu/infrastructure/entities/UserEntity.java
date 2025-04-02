@@ -1,6 +1,6 @@
-package com.tascaAndreu.tascaAndreu.infrastructure.entities;
+package com.tascaandreu.tascaandreu.infrastructure.entities;
 
-import com.tascaAndreu.tascaAndreu.domain.models.User;
+import com.tascaandreu.tascaandreu.domain.models.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
