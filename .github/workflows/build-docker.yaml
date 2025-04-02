@@ -46,18 +46,22 @@ jobs:
         run: |
           echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io -u ${{ secrets.AZURE_REGISTRY_USERNAME }} --password-stdin
           
-          # Construir con nombre de imagen explícito
-          docker-compose -f docker-compose.yml build --build-arg APP_IMAGE_NAME=${{ env.APP_IMAGE_NAME }}
+          # Verificar existencia del docker-compose.yml
+          if [ ! -f "${{ env.DOCKER_COMPOSE_PATH }}" ]; then
+            echo "Error: docker-compose.yml no encontrado en la ruta ${{ env.DOCKER_COMPOSE_PATH }}"
+            exit 1
+          fi
           
-          # Etiquetar y subir imagen de la aplicación
+          # Construir con docker-compose usando la ruta especificada
+          docker-compose -f ${{ env.DOCKER_COMPOSE_PATH }} build
+          
+          # Etiquetar y subir imágenes
           docker tag ${{ env.APP_IMAGE_NAME }} ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           
-          # Etiquetar y subir imagen de PostgreSQL
           docker tag postgresql_database ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-db:${{ env.IMAGE_TAG }}
           docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-db:${{ env.IMAGE_TAG }}
           
-          # Etiquetar y subir imagen de Nginx
           docker tag nginx ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-nginx:${{ env.IMAGE_TAG }}
           docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-nginx:${{ env.IMAGE_TAG }}
 
