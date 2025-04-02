@@ -19,15 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Instalar Docker Compose
-      - name: Install Docker Compose
-        run: sudo apt-get update && sudo apt-get install -y docker-compose
-
-      # Convierte el nombre del ACR a minúsculas y lo guarda en GITHUB_ENV
-      - name: Convert ACR name to lowercase
-        run: echo "AZURE_CONTAINER_REGISTRY_LOWER=$(echo $AZURE_CONTAINER_REGISTRY | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
-
-      # Configura Docker Buildx
+      # Configura Docker Buildx (más eficiente que docker-compose para builds)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -37,33 +29,42 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Login en ACR
+      # Convertir nombre del ACR a minúsculas
+      - name: Convert ACR name to lowercase
+        run: echo "AZURE_CONTAINER_REGISTRY_LOWER=$(echo '${{ env.AZURE_CONTAINER_REGISTRY }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      # Login en ACR con autenticación mejorada
       - name: Log in to ACR
-        run: az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}
-
-      # Reemplaza la imagen en docker-compose.yaml con la imagen subida a ACR
-      - name: Update docker-compose.yaml with ACR image
         run: |
-          sed -i 's|image: .*|image: ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }}|' docker-compose.yaml
+          az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }} --expose-token
+          echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io \
+            -u ${{ secrets.AZURE_REGISTRY_USERNAME }} \
+            --password-stdin
 
-      # Construir las imágenes
-      - name: Build images using docker-compose
+      # Construir y etiquetar la imagen directamente (más fiable que docker-compose)
+      - name: Build and tag Docker image
         run: |
-          docker-compose -f docker-compose.yaml build
+          docker build -t ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }} .
+          docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }}
 
-      # Subir las imágenes a ACR
-      - name: Push images to ACR using docker-compose
-        run: |
-          docker-compose -f docker-compose.yaml push
-
-      # Verificar si la imagen se subió correctamente a ACR
+      # Verificación más completa de la imagen en ACR
       - name: Verify image in ACR
         run: |
+          echo "Verificando imágenes en el repositorio:"
+          az acr repository list --name ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}
+          echo "\nTags disponibles:"
           az acr repository show-tags --name ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }} --repository ${{ env.CONTAINER_INSTANCE_NAME }}
 
-      # Desplegar en Azure Container Instance usando la imagen de ACR
+      # Despliegue en ACI con comprobación previa
       - name: Deploy to Azure Container Instance
         run: |
+          # Eliminar instancia existente si existe
+          az container delete \
+            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --yes || true
+
+          # Crear nueva instancia
           az container create \
             --name ${{ env.CONTAINER_INSTANCE_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
@@ -77,3 +78,10 @@ jobs:
             --location ${{ env.REGION }} \
             --dns-name-label ${{ env.CONTAINER_INSTANCE_NAME }} \
             --ports 80 8080
+
+          # Mostrar información de la instancia
+          az container show \
+            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "{FQDN:ipAddress.fqdn,ProvisioningState:provisioningState,Image:image}" \
+            --output table
