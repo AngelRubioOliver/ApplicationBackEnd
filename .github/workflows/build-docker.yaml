@@ -1,4 +1,4 @@
-name: Deploy to Azure Container Instance
+name: Deploy to Azure Container Instance with Full Debugging
 
 on:
   push:
@@ -11,6 +11,7 @@ env:
   RESOURCE_GROUP: DefaultResourceGroup-ESC
   REGION: eastus
   IMAGE_TAG: ${{ github.sha }}
+  APP_PORT: 8080  # Puerto donde escucha tu aplicación Spring Boot
 
 jobs:
   build-and-deploy:
@@ -40,7 +41,7 @@ jobs:
           echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io -u ${{ secrets.AZURE_REGISTRY_USERNAME }} --password-stdin
           docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }}
 
-      # Desplegar con configuración mejorada
+      # Desplegar con configuración optimizada
       - name: Deploy to Azure Container Instance
         run: |
           # Eliminar instancia existente si existe
@@ -54,18 +55,48 @@ jobs:
             --name ${{ env.CONTAINER_INSTANCE_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --image ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }} \
-            --cpu 1 \
-            --memory 1.5 \
+            --cpu 2 \
+            --memory 2.5 \
             --os-type Linux \
             --environment-variables SPRING_PROFILES_ACTIVE=prod \
             --registry-login-server ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io \
             --registry-username ${{ secrets.AZURE_REGISTRY_USERNAME }} \
             --registry-password ${{ secrets.AZURE_REGISTRY_PASSWORD }} \
             --location ${{ env.REGION }} \
-            --dns-name-label ${{ env.CONTAINER_INSTANCE_NAME }}-${{ github.run_id }} \
-            --ports 8080 \
-            --protocol TCP \
+            --ports ${{ env.APP_PORT }} \
+            --ip-address Public \
             --restart-policy OnFailure \
-            --command-line "sh -c 'java -Xmx1024m -jar /app.jar'" \
-            --ip-address Public
+            --command-line "sh -c 'java -Xms512m -Xmx2048m -Dserver.port=${{ env.APP_PORT }} -jar /app.jar'" \
+            --dns-name-label ${{ env.CONTAINER_INSTANCE_NAME }}-${{ github.run_id }}
 
+      # Diagnóstico completo
+      - name: Full Container Diagnostics
+        run: |
+          echo "=== Estado detallado del contenedor ==="
+          az container show \
+            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "{ProvisioningState:provisioningState, InstanceView:instanceView, FQDN:ipAddress.fqdn, IP:ipAddress.ip}" \
+            --output json
+
+          echo "\n=== Eventos del contenedor ==="
+          az container show \
+            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "instanceView.events" \
+            --output table
+
+          echo "\n=== Logs de la aplicación (últimos 200 líneas) ==="
+          az container logs \
+            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --tail 200
+
+          echo "\n=== Prueba de conectividad al endpoint ==="
+          FQDN=$(az container show \
+            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query "ipAddress.fqdn" -o tsv)
+          
+          echo "Probando conexión a: http://$FQDN:${{ env.APP_PORT }}/actuator/health"
+          curl -v --connect-timeout 30 --max-time 60 "http://$FQDN:${{ env.APP_PORT }}/actuator/health" || echo "La conexión falló"
