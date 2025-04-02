@@ -1,4 +1,4 @@
-name: Deploy to Azure Container Instance with Health Checks
+name: Deploy to Azure Container Instance
 
 on:
   push:
@@ -11,7 +11,6 @@ env:
   RESOURCE_GROUP: DefaultResourceGroup-ESC
   REGION: eastus
   IMAGE_TAG: ${{ github.sha }}
-  HEALTH_CHECK_PATH: /actuator/health  # Ruta de health check para Spring Boot
 
 jobs:
   build-and-deploy:
@@ -41,8 +40,8 @@ jobs:
           echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io -u ${{ secrets.AZURE_REGISTRY_USERNAME }} --password-stdin
           docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }}
 
-      # Desplegar con comprobaciones de salud
-      - name: Deploy with health checks
+      # Desplegar con configuración mejorada
+      - name: Deploy to Azure Container Instance
         run: |
           # Eliminar instancia existente si existe
           az container delete \
@@ -50,12 +49,13 @@ jobs:
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --yes || true
 
-          # Crear nueva instancia con health checks
+          # Crear nueva instancia con configuración mejorada
           az container create \
             --name ${{ env.CONTAINER_INSTANCE_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --image ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }} \
-            --cpu 1 --memory 1.5 \
+            --cpu 1 \
+            --memory 1.5 \
             --os-type Linux \
             --environment-variables SPRING_PROFILES_ACTIVE=prod \
             --registry-login-server ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io \
@@ -63,29 +63,24 @@ jobs:
             --registry-password ${{ secrets.AZURE_REGISTRY_PASSWORD }} \
             --location ${{ env.REGION }} \
             --dns-name-label ${{ env.CONTAINER_INSTANCE_NAME }}-${{ github.run_id }} \
-            --ports 80 8080 \
+            --ports 8080 \
             --protocol TCP \
-            --restart-policy Always \
-            --command-line "sh -c 'java -jar /app.jar'" \
-            --ip-address Public \
-            --health-probe-interval 10 \
-            --health-probe-path ${{ env.HEALTH_CHECK_PATH }} \
-            --health-probe-timeout 5 \
-            --health-probe-port 8080 \
-            --health-probe-failure-threshold 3 \
-            --health-probe-success-threshold 1
+            --restart-policy OnFailure \
+            --command-line "sh -c 'java -Xmx1024m -jar /app.jar'" \
+            --ip-address Public
 
-      # Verificar estado del contenedor
-      - name: Check container status
+      # Verificar estado y logs
+      - name: Check container status and logs
         run: |
-          echo "Estado del contenedor:"
+          echo "=== Estado del contenedor ==="
           az container show \
             --name ${{ env.CONTAINER_INSTANCE_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --query "{state:instanceView.state, events:instanceView.events}" \
-            --output json
+            --output table
 
-          echo "\nLogs del contenedor:"
+          echo "\n=== Últimos 100 logs del contenedor ==="
           az container logs \
             --name ${{ env.CONTAINER_INSTANCE_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }}
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --tail 100
