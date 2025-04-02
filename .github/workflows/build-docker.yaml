@@ -69,18 +69,3 @@ jobs:
             --command-line "sh -c 'java -Xmx1024m -jar /app.jar'" \
             --ip-address Public
 
-      # Verificar estado y logs
-      - name: Check container status and logs
-        run: |
-          echo "=== Estado del contenedor ==="
-          az container show \
-            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --query "{state:instanceView.state, events:instanceView.events}" \
-            --output table
-
-          echo "\n=== Últimos 100 logs del contenedor ==="
-          az container logs \
-            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --tail 100
