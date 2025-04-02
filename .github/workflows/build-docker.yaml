@@ -72,7 +72,7 @@ jobs:
             --registry-login-server ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io \
             --registry-username ${{ secrets.AZURE_REGISTRY_USERNAME }} \
             --registry-password ${{ secrets.AZURE_REGISTRY_PASSWORD }} \
-            --cpu 1 --memory 1 \                 # Afegit: 1.5 GB de memòria
+            --cpu 1 --memory 1GiB \                 # Afegit: 1.5 GB de memòria
             --environment-variables \
               SPRING_DATASOURCE_URL="jdbc:postgresql://postgres:5432/tascaAndreu" \
               SPRING_DATASOURCE_USERNAME="test" \
