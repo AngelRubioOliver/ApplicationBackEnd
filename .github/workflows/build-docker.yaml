@@ -46,7 +46,7 @@ jobs:
         run: |
           sed -i 's|image: .*|image: ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }}|' docker-compose.yaml
 
-      # Construir las imágenes
+      # Construir las imágenes con Docker Compose
       - name: Build images using docker-compose
         run: |
           docker-compose -f docker-compose.yaml build
@@ -55,7 +55,7 @@ jobs:
       - name: List Docker images
         run: docker images
 
-      # Subir las imágenes a ACR
+      # Subir las imágenes a ACR con Docker Compose
       - name: Push images to ACR using docker-compose
         run: |
           docker-compose -f docker-compose.yaml push
