@@ -1,4 +1,4 @@
-name: Deploy to Azure Container Instance with Full Debugging
+name: Deploy to Azure Container Instance - Fixed Version
 
 on:
   push:
@@ -11,7 +11,7 @@ env:
   RESOURCE_GROUP: DefaultResourceGroup-ESC
   REGION: eastus
   IMAGE_TAG: ${{ github.sha }}
-  APP_PORT: 8080  # Puerto donde escucha tu aplicación Spring Boot
+  APP_PORT: 8080
 
 jobs:
   build-and-deploy:
@@ -20,43 +20,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Configura Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Login en Azure
       - name: Log in to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Convertir nombre del ACR a minúsculas
       - name: Convert ACR name to lowercase
         run: echo "AZURE_CONTAINER_REGISTRY_LOWER=$(echo '${{ env.AZURE_CONTAINER_REGISTRY }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      # Construir y subir la imagen
       - name: Build and push Docker image
         run: |
           docker build -t ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }} .
           echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io -u ${{ secrets.AZURE_REGISTRY_USERNAME }} --password-stdin
           docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }}
 
-      # Desplegar con configuración optimizada
       - name: Deploy to Azure Container Instance
         run: |
-          # Eliminar instancia existente si existe
           az container delete \
             --name ${{ env.CONTAINER_INSTANCE_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --yes || true
 
-          # Crear nueva instancia con configuración mejorada
           az container create \
             --name ${{ env.CONTAINER_INSTANCE_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --image ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }} \
             --cpu 2 \
-            --memory 2.5 \
+            --memory 3 \
             --os-type Linux \
             --environment-variables SPRING_PROFILES_ACTIVE=prod \
             --registry-login-server ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io \
@@ -66,37 +59,31 @@ jobs:
             --ports ${{ env.APP_PORT }} \
             --ip-address Public \
             --restart-policy OnFailure \
-            --command-line "sh -c 'java -Xms512m -Xmx2048m -Dserver.port=${{ env.APP_PORT }} -jar /app.jar'" \
+            --command-line "sh -c 'java -Xms512m -Xmx2048m -Dserver.port=${{ env.APP_PORT }} -Dserver.address=0.0.0.0 -jar /app.jar'" \
             --dns-name-label ${{ env.CONTAINER_INSTANCE_NAME }}-${{ github.run_id }}
 
-      # Diagnóstico completo
       - name: Full Container Diagnostics
         run: |
-          echo "=== Estado detallado del contenedor ==="
+          echo "=== Container Details ==="
           az container show \
             --name ${{ env.CONTAINER_INSTANCE_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --query "{ProvisioningState:provisioningState, InstanceView:instanceView, FQDN:ipAddress.fqdn, IP:ipAddress.ip}" \
-            --output json
-
-          echo "\n=== Eventos del contenedor ==="
-          az container show \
-            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --query "instanceView.events" \
+            --query "{ProvisioningState:provisioningState, State:instanceView.state, FQDN:ipAddress.fqdn, IP:ipAddress.ip, Ports:ipAddress.ports}" \
             --output table
 
-          echo "\n=== Logs de la aplicación (últimos 200 líneas) ==="
+          echo "\n=== Container Logs ==="
           az container logs \
             --name ${{ env.CONTAINER_INSTANCE_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --tail 200
+            --resource-group ${{ env.RESOURCE_GROUP }}
 
-          echo "\n=== Prueba de conectividad al endpoint ==="
+          echo "\n=== Network Test ==="
           FQDN=$(az container show \
             --name ${{ env.CONTAINER_INSTANCE_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --query "ipAddress.fqdn" -o tsv)
           
-          echo "Probando conexión a: http://$FQDN:${{ env.APP_PORT }}/actuator/health"
-          curl -v --connect-timeout 30 --max-time 60 "http://$FQDN:${{ env.APP_PORT }}/actuator/health" || echo "La conexión falló"
+          echo "Testing connection to: http://$FQDN:${{ env.APP_PORT }}/actuator/health"
+          curl -v --retry 3 --retry-delay 5 --max-time 10 "http://$FQDN:${{ env.APP_PORT }}/actuator/health" || echo "Connection failed"
+
+          echo "\n=== Port Check ==="
+          nc -zv $FQDN ${{ env.APP_PORT }} || echo "Port check failed"
