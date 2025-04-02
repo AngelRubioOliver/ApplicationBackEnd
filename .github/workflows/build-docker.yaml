@@ -9,7 +9,7 @@ env:
   AZURE_CONTAINER_REGISTRY: tascaAndreu
   CONTAINER_INSTANCE_NAME: tascaandreu
   RESOURCE_GROUP: DefaultResourceGroup-ESC
-  REGION: eastus  # Ajusta esto a la región de tu preferencia
+  REGION: eastus
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
