@@ -11,7 +11,9 @@ env:
   REGION: eastus
   IMAGE_TAG: ${{ github.sha }}
   CONTAINER_GROUP_NAME: tascaandreu-group
-  APP_IMAGE_NAME: tascaandreu-app  # Nombre consistente para la imagen
+  APP_IMAGE_NAME: tascaandreu-app
+  DB_IMAGE_NAME: tascaandreu-db
+  NGINX_IMAGE_NAME: tascaandreu-nginx
 
 jobs:
   build-and-deploy:
@@ -20,81 +22,84 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Instalar Docker Compose
-      - name: Install Docker Compose
-        run: |
-          sudo curl -L "https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-          sudo chmod +x /usr/local/bin/docker-compose
-          docker-compose --version
-
-      # Configurar Docker Buildx
+      # Configura Docker Buildx (més eficient que Docker Compose per a CI/CD)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Login en Azure
+      # Login a Azure
       - name: Log in to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Convertir nombre del ACR a minúsculas
+      # Normalitzar nom del ACR
       - name: Convert ACR name to lowercase
         run: echo "AZURE_CONTAINER_REGISTRY_LOWER=$(echo '${{ env.AZURE_CONTAINER_REGISTRY }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      # Construir y subir imágenes
+      # Login al Azure Container Registry
+      - name: Login to ACR
+        run: |
+          echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login \
+            ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io \
+            -u ${{ secrets.AZURE_REGISTRY_USERNAME }} \
+            --password-stdin
+
+      # Construir i pujar imatges
       - name: Build and push images
         run: |
-          echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io -u ${{ secrets.AZURE_REGISTRY_USERNAME }} --password-stdin
-          
-          
-    
-          # Construir con docker-compose usando la ruta especificada
-          docker-compose up --build -d
-          
-          # Etiquetar y subir imágenes
-          docker tag ${{ env.APP_IMAGE_NAME }} ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ env.IMAGE_TAG }}
-          
-          docker tag postgresql_database ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-db:${{ env.IMAGE_TAG }}
-          docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-db:${{ env.IMAGE_TAG }}
-          
-          docker tag nginx ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-nginx:${{ env.IMAGE_TAG }}
-          docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-nginx:${{ env.IMAGE_TAG }}
+          # Build amb Docker Buildx (més ràpid i amb cache)
+          docker buildx build \
+            --tag ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            --file Dockerfile \
+            --push .
 
-      # Desplegar en ACI
+          # Si tens Dockerfiles específics per a cada servei:
+          # docker buildx build -t ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.DB_IMAGE_NAME }}:${{ env.IMAGE_TAG }} -f Dockerfile.db --push .
+          # docker buildx build -t ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.NGINX_IMAGE_NAME }}:${{ env.IMAGE_TAG }} -f Dockerfile.nginx --push .
+
+      # Desplegar a ACI (versió millorada)
       - name: Deploy to ACI
         run: |
+          # Eliminar instància existent si existeix
           az container delete \
             --name ${{ env.CONTAINER_GROUP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --yes || true
 
+          # Crear nova instància amb configuració millorada
           az container create \
             --name ${{ env.CONTAINER_GROUP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --image ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
             --location ${{ env.REGION }} \
             --ip-address Public \
-            --ports 8080 80 443 \
+            --ports 80 443 \
             --os-type Linux \
             --restart-policy Always \
             --registry-login-server ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io \
             --registry-username ${{ secrets.AZURE_REGISTRY_USERNAME }} \
             --registry-password ${{ secrets.AZURE_REGISTRY_PASSWORD }} \
             --environment-variables \
-              SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/tascaAndreu \
-              SPRING_DATASOURCE_USERNAME=test \
-              SPRING_DATASOURCE_PASSWORD=test \
-            --command-line "sh -c 'java -jar /app.jar'" \
+              SPRING_DATASOURCE_URL="${{ secrets.SPRING_DATASOURCE_URL }}" \
+              SPRING_DATASOURCE_USERNAME="${{ secrets.SPRING_DATASOURCE_USERNAME }}" \
+              SPRING_DATASOURCE_PASSWORD="${{ secrets.SPRING_DATASOURCE_PASSWORD }}" \
             --cpu 2 \
             --memory 3.5 \
             --dns-name-label ${{ env.CONTAINER_GROUP_NAME }}-${{ github.run_id }}
 
+      # Verificació del desplegament
       - name: Verify deployment
         run: |
           echo "=== Container Group Details ==="
           az container show \
             --name ${{ env.CONTAINER_GROUP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --query "{FQDN:ipAddress.fqdn, State:provisioningState}" \
+            --query "{FQDN:ipAddress.fqdn, State:provisioningState, IP:ipAddress.ip}" \
             --output table
+          
+          echo "=== Application URL ==="
+          echo "http://$(az container show \
+            --name ${{ env.CONTAINER_GROUP_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --query 'ipAddress.fqdn' \
+            --output tsv)"
