@@ -19,17 +19,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-
-        # Instalar Docker Compose
+      # Instalar Docker Compose
       - name: Install Docker Compose
         run: sudo apt-get update && sudo apt-get install -y docker-compose
-
 
       # Convierte el nombre del ACR a minúsculas y lo guarda en GITHUB_ENV
       - name: Convert ACR name to lowercase
         run: echo "AZURE_CONTAINER_REGISTRY_LOWER=$(echo $AZURE_CONTAINER_REGISTRY | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      # Configura Docker
+      # Configura Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -54,7 +52,12 @@ jobs:
           docker-compose -f docker-compose.yaml build
           docker-compose -f docker-compose.yaml push
 
-      # Desplegar en Azure Container Instance usando docker-compose
+      # Verificar si la imagen se subió correctamente
+      - name: Verify image in ACR
+        run: |
+          az acr repository show-tags --name ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }} --repository ${{ env.CONTAINER_INSTANCE_NAME }}
+
+      # Desplegar en Azure Container Instance usando la imagen de ACR
       - name: Deploy to Azure Container Instance
         run: |
           az container create \
