@@ -50,7 +50,8 @@ jobs:
           context: .
           file: Dockerfile  # Asegúrate de que sea para Java
           push: true
-          tags: ${{ tascaandreu }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }}
+          tags: ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_APP_NAME }}:${{ github.sha }}
+
 
       # Despliega en Azure Container Apps
       - name: Deploy to Azure Container Apps
