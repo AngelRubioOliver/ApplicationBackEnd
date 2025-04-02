@@ -1,4 +1,4 @@
-name: Deploy to Azure Container Instance - Fixed Version
+name: Deploy to Azure Container Instances
 
 on:
   push:
@@ -7,11 +7,10 @@ on:
 
 env:
   AZURE_CONTAINER_REGISTRY: tascaAndreu
-  CONTAINER_INSTANCE_NAME: tascaandreu
   RESOURCE_GROUP: DefaultResourceGroup-ESC
   REGION: eastus
   IMAGE_TAG: ${{ github.sha }}
-  APP_PORT: 8080
+  CONTAINER_GROUP_NAME: tascaandreu-group
 
 jobs:
   build-and-deploy:
@@ -20,70 +19,84 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Configurar Docker Buildx
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Login en Azure
       - name: Log in to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      # Convertir nombre del ACR a minúsculas
       - name: Convert ACR name to lowercase
         run: echo "AZURE_CONTAINER_REGISTRY_LOWER=$(echo '${{ env.AZURE_CONTAINER_REGISTRY }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
 
-      - name: Build and push Docker image
+      # Construir y subir imágenes
+      - name: Build and push images
         run: |
-          docker build -t ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }} .
           echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io -u ${{ secrets.AZURE_REGISTRY_USERNAME }} --password-stdin
-          docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }}
+          
+          # Construir imágenes
+          docker-compose build
+          
+          # Etiquetar y subir imagen de la aplicación
+          docker tag tascaandreu_application ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-app:${{ env.IMAGE_TAG }}
+          docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-app:${{ env.IMAGE_TAG }}
+          
+          # Etiquetar y subir imagen de PostgreSQL
+          docker tag postgresql_database ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-db:${{ env.IMAGE_TAG }}
+          docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-db:${{ env.IMAGE_TAG }}
+          
+          # Etiquetar y subir imagen de Nginx
+          docker tag nginx ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-nginx:${{ env.IMAGE_TAG }}
+          docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-nginx:${{ env.IMAGE_TAG }}
 
-      - name: Deploy to Azure Container Instance
+      # Desplegar en Azure Container Instances
+      - name: Deploy to ACI
         run: |
+          # Eliminar grupo de contenedores existente si existe
           az container delete \
-            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
+            --name ${{ env.CONTAINER_GROUP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --yes || true
 
+          # Crear nuevo grupo de contenedores con los tres contenedores
           az container create \
-            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
+            --name ${{ env.CONTAINER_GROUP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.CONTAINER_INSTANCE_NAME }}:${{ env.IMAGE_TAG }} \
-            --cpu 2 \
-            --memory 3 \
+            --image ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-app:${{ env.IMAGE_TAG }} \
+            --location ${{ env.REGION }} \
+            --ip-address Public \
+            --ports 8080 80 443 \
             --os-type Linux \
-            --environment-variables SPRING_PROFILES_ACTIVE=prod \
+            --restart-policy Always \
             --registry-login-server ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io \
             --registry-username ${{ secrets.AZURE_REGISTRY_USERNAME }} \
             --registry-password ${{ secrets.AZURE_REGISTRY_PASSWORD }} \
-            --location ${{ env.REGION }} \
-            --ports ${{ env.APP_PORT }} \
-            --ip-address Public \
-            --restart-policy OnFailure \
-            --command-line "sh -c 'java -Xms512m -Xmx2048m -Dserver.port=${{ env.APP_PORT }} -Dserver.address=0.0.0.0 -jar /app.jar'" \
-            --dns-name-label ${{ env.CONTAINER_INSTANCE_NAME }}-${{ github.run_id }}
+            --environment-variables \
+              SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/tascaAndreu \
+              SPRING_DATASOURCE_USERNAME=test \
+              SPRING_DATASOURCE_PASSWORD=test \
+            --command-line "sh -c 'java -jar /app.jar'" \
+            --cpu 2 \
+            --memory 3.5 \
+            --dns-name-label ${{ env.CONTAINER_GROUP_NAME }}-${{ github.run_id }} \
+            --acr-identity ${{ secrets.AZURE_ACR_IDENTITY }}
 
-      - name: Full Container Diagnostics
+      # Verificar el despliegue
+      - name: Verify deployment
         run: |
-          echo "=== Container Details ==="
+          echo "=== Detalles del grupo de contenedores ==="
           az container show \
-            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
+            --name ${{ env.CONTAINER_GROUP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --query "{ProvisioningState:provisioningState, State:instanceView.state, FQDN:ipAddress.fqdn, IP:ipAddress.ip, Ports:ipAddress.ports}" \
+            --query "{FQDN:ipAddress.fqdn, State:provisioningState, Containers:containers[*].name}" \
             --output table
 
-          echo "\n=== Container Logs ==="
+          echo "\n=== Logs de la aplicación ==="
           az container logs \
-            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }}
-
-          echo "\n=== Network Test ==="
-          FQDN=$(az container show \
-            --name ${{ env.CONTAINER_INSTANCE_NAME }} \
+            --name ${{ env.CONTAINER_GROUP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --query "ipAddress.fqdn" -o tsv)
-          
-          echo "Testing connection to: http://$FQDN:${{ env.APP_PORT }}/actuator/health"
-          curl -v --retry 3 --retry-delay 5 --max-time 10 "http://$FQDN:${{ env.APP_PORT }}/actuator/health" || echo "Connection failed"
-
-          echo "\n=== Port Check ==="
-          nc -zv $FQDN ${{ env.APP_PORT }} || echo "Port check failed"
+            --container-name tascaandreu_application
