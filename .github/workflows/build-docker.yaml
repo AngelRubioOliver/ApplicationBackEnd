@@ -63,4 +63,4 @@ jobs:
           resourceGroup: ${{ env.RESOURCE_GROUP }}
           containerAppName: ${{ env.CONTAINER_APP_NAME }}
           environmentVariables: |
-            SPRING_PROFILES_ACTIVE=prod  # Para Spring Boot, no ASPNETCORE_ENVIRONMENT
+            SPRING_PROFILES_ACTIVE=prod
