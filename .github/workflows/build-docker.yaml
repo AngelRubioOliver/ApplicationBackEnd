@@ -11,6 +11,7 @@ env:
   REGION: eastus
   IMAGE_TAG: ${{ github.sha }}
   CONTAINER_GROUP_NAME: tascaandreu-group
+  APP_IMAGE_NAME: tascaandreu-app  # Nombre consistente para la imagen
 
 jobs:
   build-and-deploy:
@@ -19,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-        # Instalar Docker Compose
+      # Instalar Docker Compose
       - name: Install Docker Compose
         run: |
           sudo curl -L "https://github.com/docker/compose/releases/download/v2.23.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
@@ -45,12 +46,12 @@ jobs:
         run: |
           echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io -u ${{ secrets.AZURE_REGISTRY_USERNAME }} --password-stdin
           
-          # Construir imágenes
-          docker-compose build
+          # Construir con nombre de imagen explícito
+          docker-compose -f docker-compose.yml build --build-arg APP_IMAGE_NAME=${{ env.APP_IMAGE_NAME }}
           
           # Etiquetar y subir imagen de la aplicación
-          docker tag tascaandreu_application ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-app:${{ env.IMAGE_TAG }}
-          docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-app:${{ env.IMAGE_TAG }}
+          docker tag ${{ env.APP_IMAGE_NAME }} ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ env.IMAGE_TAG }}
           
           # Etiquetar y subir imagen de PostgreSQL
           docker tag postgresql_database ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-db:${{ env.IMAGE_TAG }}
@@ -60,20 +61,18 @@ jobs:
           docker tag nginx ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-nginx:${{ env.IMAGE_TAG }}
           docker push ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-nginx:${{ env.IMAGE_TAG }}
 
-      # Desplegar en Azure Container Instances
+      # Desplegar en ACI
       - name: Deploy to ACI
         run: |
-          # Eliminar grupo de contenedores existente si existe
           az container delete \
             --name ${{ env.CONTAINER_GROUP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
             --yes || true
 
-          # Crear nuevo grupo de contenedores con los tres contenedores
           az container create \
             --name ${{ env.CONTAINER_GROUP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --image ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/tascaandreu-app:${{ env.IMAGE_TAG }} \
+            --image ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io/${{ env.APP_IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
             --location ${{ env.REGION }} \
             --ip-address Public \
             --ports 8080 80 443 \
@@ -89,21 +88,13 @@ jobs:
             --command-line "sh -c 'java -jar /app.jar'" \
             --cpu 2 \
             --memory 3.5 \
-            --dns-name-label ${{ env.CONTAINER_GROUP_NAME }}-${{ github.run_id }} \
-            --acr-identity ${{ secrets.AZURE_ACR_IDENTITY }}
+            --dns-name-label ${{ env.CONTAINER_GROUP_NAME }}-${{ github.run_id }}
 
-      # Verificar el despliegue
       - name: Verify deployment
         run: |
-          echo "=== Detalles del grupo de contenedores ==="
+          echo "=== Container Group Details ==="
           az container show \
             --name ${{ env.CONTAINER_GROUP_NAME }} \
             --resource-group ${{ env.RESOURCE_GROUP }} \
-            --query "{FQDN:ipAddress.fqdn, State:provisioningState, Containers:containers[*].name}" \
+            --query "{FQDN:ipAddress.fqdn, State:provisioningState}" \
             --output table
-
-          echo "\n=== Logs de la aplicación ==="
-          az container logs \
-            --name ${{ env.CONTAINER_GROUP_NAME }} \
-            --resource-group ${{ env.RESOURCE_GROUP }} \
-            --container-name tascaandreu_application
