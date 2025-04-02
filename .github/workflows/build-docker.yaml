@@ -70,5 +70,8 @@ jobs:
             --registry-login-server ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io \
             --registry-username ${{ secrets.AZURE_REGISTRY_USERNAME }} \
             --registry-password ${{ secrets.AZURE_REGISTRY_PASSWORD }} \
-            --location ${{ env.REGION }}
+            --location ${{ env.REGION }} \
+            --dns-name-label ${{ env.CONTAINER_INSTANCE_NAME }} \
+            --ports 80 8080
+      
       
