@@ -67,6 +67,6 @@ jobs:
             --cpu 1 --memory 1 Gi \
             --environment-variables SPRING_PROFILES_ACTIVE=prod \
             --registry-login-server ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io \
-            --registry-username ${{ secrets.ACR_USERNAME }} \
-            --registry-password ${{ secrets.ACR_PASSWORD }} \
+            --registry-username ${{ secrets.AZURE_REGISTRY_USERNAME }} \
+            --registry-password ${{ secrets.AZURE_REGISTRY_PASSWORD }} \
             --location ${{ env.REGION }}
