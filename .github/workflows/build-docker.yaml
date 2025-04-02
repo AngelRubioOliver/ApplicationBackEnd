@@ -46,12 +46,8 @@ jobs:
         run: |
           echo "${{ secrets.AZURE_REGISTRY_PASSWORD }}" | docker login ${{ env.AZURE_CONTAINER_REGISTRY_LOWER }}.azurecr.io -u ${{ secrets.AZURE_REGISTRY_USERNAME }} --password-stdin
           
-          # Verificar existencia del docker-compose.yml
-          if [ ! -f "${{ env.DOCKER_COMPOSE_PATH }}" ]; then
-            echo "Error: docker-compose.yml no encontrado en la ruta ${{ env.DOCKER_COMPOSE_PATH }}"
-            exit 1
-          fi
           
+    
           # Construir con docker-compose usando la ruta especificada
           docker-compose -f ${{ env.DOCKER_COMPOSE_PATH }} build
           
